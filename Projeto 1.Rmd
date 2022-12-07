@@ -1,0 +1,135 @@
+---
+title: "Credit"
+author: "Rodrigo"
+date: "2022-12-07"
+output: html_document
+---
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+
+# Carregando Pacotes e Treino e Teste
+```{r}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+library(rsample)
+library(rpart)
+library(partykit)
+library(ISLR)
+library(ggplot2)
+library("rpart.plot")
+library(dplyr)
+
+```
+
+```{r}
+
+set.seed(21)
+splits <- initial_split(Credit, prop = .8)
+tr <- training(splits)
+test <- testing(splits)
+arvore <- rpart(Balance ~ . -ID, data = tr)
+arvore <- as.party(arvore)
+plot(arvore)
+
+
+
+
+
+```
+
+
+# Usando o rpart.plot
+```{r}
+
+
+set.seed(21)
+splits <- initial_split(Credit, prop = .8)
+tr <- training(splits)
+test <- testing(splits)
+arvore <- rpart(Balance ~ . -ID, data = tr)
+rpart.plot(arvore, roundint = FALSE)
+
+```
+
+
+# Erro x cp: complexity parameter
+```{r}
+
+set.seed(202)
+arvore <- rpart(Balance ~ . -ID, data = tr, control = rpart.control(xval = 10, cp = 0))
+plotcp(arvore)
+
+```
+
+
+# cp: complexity parameter Table
+```{r}
+
+arvore$cptable
+
+```
+
+```{r}
+
+ 
+
+cp_ot <- arvore$cptable[which.min(arvore$cptable[,"xerror"]),"CP"]
+cp_ot <- arvore$cptable %>%
+as_tibble() %>%
+filter(xerror == min(xerror))
+# OU std
+corte <- arvore$cptable %>%
+as_tibble() %>%
+filter(xerror == min(xerror)) %>%
+transmute(corte = xerror + xstd)
+cp_ot <- arvore$cptable %>%
+as_tibble() %>%
+filter(xerror <= corte[[1]])
+
+
+```
+
+
+# Poda
+```{r}
+
+poda1 <- prune(arvore, cp = cp_ot$CP[1])
+rpart.plot(poda1, roundint = FALSE)
+
+```
+
+
+# Poda Plot
+```{r}
+poda1 <- prune(arvore, cp = 0)
+rpart.plot(poda1, roundint = FALSE)
+
+```
+
+
+# Predito x Observado
+```{r}
+
+
+tibble(y_obs = test$Balance,
+       y_pred = predict(poda1, newdata = test)) %>%
+  ggplot(aes(y_obs, y_pred)) +
+geom_abline(slope = 1, intercept = 0, color = "red", size = 2) +
+geom_point(size = 3, alpha = .5)
+
+
+
+
+```
+
+
+# Importância das Variáveis
+```{r}
+
+vip::vip(poda1, aesthetics = list(fill = "darkblue")) +
+theme_bw()
+
+```
+
